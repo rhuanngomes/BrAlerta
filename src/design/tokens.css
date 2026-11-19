@@ -1,0 +1,46 @@
+/*
+  BR ALERTA — Identidade visual (cores, fonte, cantos e sombras)
+  Responsável: Enzo (Design e Assets 3D)
+
+  Cada variável abaixo vira uma classe do Tailwind automaticamente.
+  Exemplos:  bg-navy  text-coral  border-linha  bg-pendente-fundo  rounded-card  shadow-card
+  Os valores são os mesmos que o app já usava, agora com nome oficial.
+*/
+@theme {
+  /* Fonte */
+  --font-sans: "Manrope", system-ui, sans-serif;
+
+  /* Marca */
+  --color-navy: #142238;          /* textos principais, botões escuros */
+  --color-navy-escuro: #101b2b;   /* detalhes do logo, hover escuro */
+  --color-coral: #f04e45;         /* cor da marca e botão de destaque */
+  --color-coral-escuro: #c73831;  /* hover do botão coral */
+  --color-coral-claro: #fff0ef;   /* fundo de alertas leves */
+
+  /* Neutros */
+  --color-fundo: #eef2f7;         /* fundo da página */
+  --color-superficie: #f5f7fa;    /* áreas internas, inputs */
+  --color-linha: #e2e8f0;         /* bordas e divisórias */
+  --color-texto-suave: #6f7e93;   /* textos secundários */
+
+  /* Categorias de ocorrência */
+  --color-poste: #f4a340;         /* Poste apagado */
+  --color-buraco: #f04e45;        /* Buraco na rua */
+
+  /* Status (texto + fundo do selo) */
+  --color-pendente: #b56708;
+  --color-pendente-fundo: #fff4e6;
+  --color-andamento: #2868bd;
+  --color-andamento-fundo: #eaf2ff;
+  --color-resolvido: #187653;
+  --color-resolvido-fundo: #e9f8f1;
+  --color-cancelado: #596579;
+  --color-cancelado-fundo: #f1f3f5;
+
+  /* Cantos e sombras */
+  --radius-botao: 12px;
+  --radius-card: 14px;
+  --radius-painel: 20px;
+  --shadow-card: 0 18px 60px #8393a92b;
+  --shadow-flutuante: 0 10px 25px #14223833;
+}

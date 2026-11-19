@@ -18,12 +18,13 @@ type SceneObject = {
 
 const MODEL_ZOOM_THRESHOLD = 15.5;
 const SCENE_VISUAL_SCALE = 6;
+const publicAsset = (path: string) => `${import.meta.env.BASE_URL}${path}`;
 
 const categoryModelPaths: Record<IncidentCategory, string> = {
-  STREETLIGHT: '/models/STREETLIGHT.glb',
-  POTHOLE: '/models/POTHOLE.glb',
-  FLOOD: '/models/FLOOD.glb',
-  SAFETY: '/models/SAFETY.glb',
+  STREETLIGHT: publicAsset('modelos/poste-apagado.glb'),
+  POTHOLE: publicAsset('modelos/buraco.glb'),
+  FLOOD: publicAsset('models/FLOOD.glb'),
+  SAFETY: publicAsset('models/SAFETY.glb'),
 };
 
 export class ThreeSceneLayer implements CustomLayerInterface {

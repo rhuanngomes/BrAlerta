@@ -10,6 +10,7 @@ import type {
 import { Crosshair, Layers3, LocateFixed, Minus, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
+import { visualDaCategoria } from '../../design/assets';
 import type { Incident, IncidentCategory } from '../../types';
 import { incidentCategoryLabels } from '../../types';
 import type { ThreeSceneLayer as ThreeSceneLayerType } from './ThreeSceneLayer';
@@ -257,11 +258,16 @@ export function CityMap({
         pin.append(shape);
         const visual = document.createElement('span');
         visual.className = 'map-marker-visual';
+        const officialMarker = document.createElement('img');
+        officialMarker.className = 'map-marker-image';
+        officialMarker.alt = '';
+        officialMarker.width = 40;
+        officialMarker.height = 52;
         const icon = document.createElement('span');
         icon.className = 'map-marker-icon';
         icon.setAttribute('aria-hidden', 'true');
         visual.append(pin, icon);
-        element.append(visual);
+        element.append(visual, officialMarker);
         marker = new maplibregl.Marker({
           element,
           anchor: 'bottom',
@@ -280,6 +286,8 @@ export function CityMap({
 
       const element = marker.getElement();
       const icon = element.querySelector('.map-marker-icon');
+      const officialMarker = element.querySelector<HTMLImageElement>('.map-marker-image');
+      const categoryVisual = visualDaCategoria(incident.category);
       for (const { value } of categoryOptions) {
         element.classList.toggle(
           value.toLowerCase(),
@@ -287,6 +295,7 @@ export function CityMap({
         );
       }
       element.classList.add('map-marker');
+      element.classList.toggle('has-official-marker', Boolean(categoryVisual));
       element.classList.toggle('active', selectedId === incident.id);
       element.setAttribute('aria-label', incident.title);
       element.title = `${incident.title} · ${incidentCategoryLabels[incident.category]}`;
@@ -294,6 +303,7 @@ export function CityMap({
         icon.textContent = categoryOptions.find(({ value }) => value === incident.category)?.icon
           ?? '!';
       }
+      if (officialMarker && categoryVisual) officialMarker.src = categoryVisual.marcador;
     }
   }, [incidents, selectedId]);
 

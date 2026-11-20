@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,7 +18,7 @@ vi.mock('../src/context/IncidentsContext', () => ({
 function LocationProbe() {
   const location = useLocation();
   const incidentId = (location.state as { incidentId?: string } | null)?.incidentId;
-  return <span data-testid="location">{`${location.pathname}:${incidentId ?? ''}`}</span>;
+  return <span data-testid="location" data-search={location.search}>{`${location.pathname}:${incidentId ?? ''}`}</span>;
 }
 
 function makeIncident(): Incident {
@@ -129,7 +129,7 @@ describe('notificações no layout principal', () => {
 
     await user.click(screen.getByRole('button', { name: /^Nova ocorrência registrada/ }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/map:BRA-0001');
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/map:BRA-0001'));
     expect(markNotificationRead).toHaveBeenCalledWith('BRA-0001-created');
   });
 
@@ -147,4 +147,16 @@ describe('notificações no layout principal', () => {
       'BRA-0001-created',
     ]);
   });
+});
+
+it('filtra categorias, limpa o filtro e recolhe o menu', async () => {
+  const user = userEvent.setup();
+  setup();
+  await user.click(screen.getByRole('button', { name: 'Rua alagada', exact: true }));
+  expect(screen.getByTestId('location')).toHaveAttribute('data-search', '?category=FLOOD');
+  expect(screen.getByRole('button', { name: 'Rua alagada', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await user.click(screen.getByRole('button', { name: 'Todas as categorias' }));
+  expect(screen.getByTestId('location')).toHaveAttribute('data-search', '');
+  await user.click(screen.getByRole('button', { name: 'Categorias', exact: true }));
+  expect(screen.queryByRole('button', { name: 'Rua alagada' })).not.toBeInTheDocument();
 });

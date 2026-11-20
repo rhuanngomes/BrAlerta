@@ -34,6 +34,7 @@ function parseCategoryFilter(value: string): CategoryFilter | null {
     case 'POTHOLE':
     case 'FLOOD':
     case 'SAFETY':
+    case 'TRAFFIC':
       return value;
     default:
       return null;
@@ -163,6 +164,7 @@ export function AdminPage() {
                 <option value="POTHOLE">Buraco na rua</option>
                 <option value="FLOOD">Rua alagada</option>
                 <option value="SAFETY">Ocorrência de segurança</option>
+                <option value="TRAFFIC">Trânsito intenso</option>
               </select>
             </label>
             <label className="admin-filter">

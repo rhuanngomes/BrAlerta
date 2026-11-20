@@ -1,4 +1,5 @@
 import {
+  Car,
   ChevronRight,
   Lightbulb,
   Map as MapIcon,
@@ -8,6 +9,7 @@ import {
   Waves,
   X,
 } from 'lucide-react';
+import { useState } from 'react';
 import { incidentCategoryLabels } from '../../types';
 import type { Incident, IncidentCategory, IncidentStatus } from '../../types';
 
@@ -16,11 +18,12 @@ const categories: Record<IncidentCategory, { Icon: typeof Lightbulb }> = {
   POTHOLE: { Icon: TriangleAlert },
   FLOOD: { Icon: Waves },
   SAFETY: { Icon: ShieldAlert },
+  TRAFFIC: { Icon: Car },
 };
 
 const statusLabels: Record<IncidentStatus, string> = {
   PENDING: 'Pendente',
-  IN_PROGRESS: 'Em análise',
+  IN_PROGRESS: 'Em andamento',
   RESOLVED: 'Resolvido',
   CANCELLED: 'Cancelada',
 };
@@ -42,11 +45,27 @@ export function IncidentDetails({
   incident,
   onClose,
   onMap,
+  onUpdateStatus,
+  attendant,
 }: {
   incident: Incident;
   onClose: () => void;
   onMap?: () => void;
+  onUpdateStatus?: (status: IncidentStatus) => Promise<Incident>;
+  attendant?: string;
 }) {
+  const [nextStatus, setNextStatus] = useState<IncidentStatus>(incident.status);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [saveError, setSaveError] = useState('');
+  async function saveStatus(event: React.FormEvent) {
+    event.preventDefault();
+    if (!onUpdateStatus || saving) return;
+    setSaving(true); setFeedback(''); setSaveError('');
+    try { await onUpdateStatus(nextStatus); setFeedback('Status atualizado. A população pode acompanhar a mudança no histórico.'); }
+    catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Não foi possível atualizar. Tente novamente.'); }
+    finally { setSaving(false); }
+  }
   const { Icon: CategoryIcon } = categories[incident.category];
   const categoryLabel = incidentCategoryLabels[incident.category];
   const isCancelled = incident.status === 'CANCELLED';
@@ -70,7 +89,7 @@ export function IncidentDetails({
     ]
     : [
       { label: 'Ocorrência registrada', changedAt: incident.createdAt },
-      { label: 'Em análise', changedAt: inProgressAt },
+      { label: 'Em andamento', changedAt: inProgressAt },
       { label: 'Resolvido', changedAt: resolvedAt },
     ];
 
@@ -125,6 +144,15 @@ export function IncidentDetails({
           </div>
         </dl>
 
+        {onUpdateStatus && <form className="incident-attendance" onSubmit={saveStatus}>
+          <h3>Atender ocorrência</h3><p>{attendant}</p>
+          <label>Novo status<select value={nextStatus} onChange={e => { setNextStatus(e.target.value as IncidentStatus); setFeedback(''); }} disabled={saving}>
+            <option value="PENDING">Pendente</option><option value="IN_PROGRESS">Em andamento</option><option value="RESOLVED">Resolvida</option><option value="CANCELLED">Cancelada</option>
+          </select></label>
+          <button className="primary" type="submit" disabled={saving || nextStatus === incident.status}>{saving ? 'Atualizando…' : 'Atualizar status'}</button>
+          {feedback && <p role="status" className="attendance-success">{feedback}</p>}
+          {saveError && <p role="alert" className="auth-error">{saveError}</p>}
+        </form>}
         {onMap && (
           <button className="detail-map-button" onClick={onMap}>
             <MapIcon aria-hidden="true" />
@@ -157,6 +185,7 @@ export function IncidentDetails({
               );
             })}
           </div>
+          {incident.history.length > 1 && <details className="status-audit"><summary>Ver todas as atualizações ({incident.history.length})</summary><ol>{[...incident.history].reverse().map(entry => <li key={entry.id}><b>{entry.eventType === 'DETAILS_UPDATED' ? 'Dados da ocorrência editados' : `${entry.previousStatus ? `${statusLabels[entry.previousStatus]} → ` : ''}${statusLabels[entry.newStatus]}`}</b><time>{formatDateTime(entry.changedAt)}</time></li>)}</ol></details>}
         </section>
       </div>
     </aside>

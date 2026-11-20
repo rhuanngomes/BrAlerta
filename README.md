@@ -117,7 +117,7 @@ npm run test:db    # roda os testes de banco e RLS (requer Supabase local)
 - `src/data`: seed inicial gravado apenas quando não há dados no navegador.
 - `supabase/migrations`: tabelas, validações, índices e RLS sem políticas públicas permissivas.
 
-Sem `VITE_USE_SUPABASE=true`, login e cadastro funcionam em modo demonstrativo local: o login aceita um e-mail válido e qualquer senha não vazia, não salva a senha e cria apenas perfis de cidadão. Cada e-mail identifica seu próprio estado demonstrativo, que não autentica no servidor. A opção “Entrar com outro usuário” no menu do perfil permite voltar ao login. No Supabase, RPCs protegidas permitem editar ou cancelar somente ocorrências pendentes do próprio cidadão; ambas preservam o histórico. As leituras das notificações também são vinculadas ao usuário.
+Sem `VITE_USE_SUPABASE=true`, login e cadastro funcionam em modo demonstrativo local: o login aceita um e-mail válido e qualquer senha não vazia, não salva a senha e permite cadastrar perfis de cidadão ou órgão público. Os dados do perfil público ficam no navegador e são recuperados ao entrar novamente com o mesmo e-mail. Cada e-mail identifica seu próprio estado demonstrativo, que não autentica no servidor. A opção “Entrar com outro usuário” no menu do perfil permite voltar ao login. No Supabase, RPCs protegidas permitem editar ou cancelar somente ocorrências pendentes do próprio cidadão; ambas preservam o histórico. As leituras das notificações também são vinculadas ao usuário.
 
 ### Conectar a um projeto Supabase
 
@@ -161,7 +161,7 @@ set role = 'ADMIN', updated_at = now()
 where email = 'email-do-administrador@exemplo.com';
 ```
 
-Novas contas sempre começam como `CITIZEN`. A promoção para `ADMIN` nunca é feita pela interface, e as políticas RLS garantem a autorização mesmo que alguém tente usar a API diretamente.
+Novas contas escolhem `CITIZEN` ou `PUBLIC_AGENT`; o segundo exige órgão, esfera e cargo. A identidade institucional é autodeclarada neste fluxo, sem verificação de vínculo institucional. A promoção para `ADMIN` nunca é feita pela interface, e as políticas RLS garantem a autorização mesmo que alguém tente usar a API diretamente.
 
 ## Estrutura do projeto
 
@@ -189,13 +189,13 @@ tests/              # testes automatizados do front-end e dos repositórios
 | `incidents` | Ocorrência: categoria, título, descrição, latitude, longitude, endereço, status, foto e datas |
 | `scene_objects` | Objeto que representa a ocorrência no mapa: tipo, posição, altitude, rotação e escala |
 | `incident_history` | Cada mudança de status, com quem mudou e quando |
-| `profiles` | Nome, e-mail e papel do usuário (`CITIZEN` ou `ADMIN`) |
+| `profiles` | Nome, e-mail e papel do usuário (`CITIZEN`, `PUBLIC_AGENT` ou `ADMIN`), órgão, esfera e cargo |
 
 Regras principais:
 
 - qualquer usuário logado vê as ocorrências;
 - o cidadão só cria ocorrências em seu próprio nome;
-- só administradores mudam o status, sempre pela função `update_incident_status`, que grava o histórico na mesma transação.
+- agentes públicos e administradores mudam o status, sempre pela função `update_incident_status`, que grava o histórico na mesma transação.
 
 ## Testes e qualidade
 
@@ -209,13 +209,13 @@ Encontrados na revisão de qualidade e registrados para correção:
 
 | ID | Gravidade | Descrição |
 | --- | --- | --- |
-| BUG-01 | Alta | No modo demonstração, o perfil é sempre Cidadão, então o painel administrativo não aparece no menu e `/admin` volta para o mapa. |
+| BUG-01 | Resolvido | Cadastro público permite atendimento no mapa também no modo demonstrativo; `/admin` continua exclusivo de administradores. |
 | BUG-02 | Média | No modo demonstração, o botão Sair gera erro, porque tenta usar o Supabase, que não está configurado. |
 | BUG-03 | Média | O marcador de prévia continua no mapa depois de publicar ou cancelar uma ocorrência. |
 | BUG-04 | Média | A prévia no mapa sempre mostra o ícone de poste, mesmo quando a categoria escolhida é buraco. |
 | BUG-05 | Baixa | A coluna Localização do painel e o endereço do formulário são fixos ("Recreio, RJ"). |
 | BUG-06 | Baixa | Ao alternar entre Mapa 2D e 3D, a câmera volta para a última ocorrência aberta. |
-| BUG-07 | Baixa | A busca do topo usa um alerta do navegador e o sino de notificações ainda não tem função. |
+| BUG-07 | Resolvido | Busca real conectada ao mapa e notificações com histórico e controle de leitura. |
 | BUG-08 | Baixa | A página Sobre cita "Global Solution", mas o projeto é do Enterprise Challenge. |
 
 ## Roteiro de demonstração
@@ -224,11 +224,38 @@ Encontrados na revisão de qualidade e registrados para correção:
 2. Clicar em uma ocorrência e mostrar os detalhes e o histórico.
 3. Clicar em **Registrar ocorrência**, escolher a categoria, clicar na rua e publicar.
 4. Abrir **Minhas ocorrências** e filtrar por status.
-5. Entrar como administrador, abrir o **Painel administrativo**, buscar a ocorrência criada e mudar o status para **Em andamento**.
+5. Cadastrar uma conta de **Órgão público**, informar esfera, órgão e cargo; abrir a ocorrência no mapa e mudar o status para **Em andamento**.
 6. Voltar ao mapa e mostrar o novo status no histórico.
 
-> No modo demonstração, o passo 5 depende da correção do BUG-01. Para a apresentação, use o modo Supabase com um usuário administrador.
+> O atendimento funciona no modo demonstrativo e no Supabase após aplicar a migração de contas públicas. O modo demonstrativo salva alterações apenas neste navegador.
+
+## Cidade viva em 3D
+
+A vista **Cidade 3D** usa MapLibre com dados vetoriais OpenFreeMap / OpenStreetMap e uma cena Three.js em metros. Ruas, curvas e posições dos relatos são geográficas; prédios e mobiliário são uma representação artística, não uma reprodução cadastral. Os modelos locais KayKit City Builder Bits são CC0; a licença acompanha `public/models/city/LICENSE.txt`.
+
+A cena inclui fachadas, calçadas, faixas, semáforos, iluminação, árvores e circulação de carros e pedestres. A decoração é reconstruída ao navegar, em uma área limitada ao redor da câmera, com instâncias compartilhadas para reduzir o custo gráfico. Não são inventadas ruas para formar uma grade.
+
+- **Rua alagada:** lâmina de água, ondas, carro parcialmente submerso e bloqueios.
+- **Trânsito intenso:** oito carros adicionais; o tráfego próximo desacelera.
+- **Segurança:** dois personagens de ladrões animados.
+- **Buraco:** cratera, cones e barreira.
+- **Poste apagado:** poste com sinalização.
+
+Escolha uma categoria na barra inferior, clique no mapa e preencha o relato. Pontos a até 22 metros de uma via são encaixados nela; o local final aparece no formulário. O clique fixa a prévia e outro clique reposiciona. A publicação salva a ocorrência pelo repositório existente. Ocorrências resolvidas ou canceladas deixam de produzir efeitos na cidade. Os botões permitem pausar a simulação, girar a câmera, aproximar e voltar à área inicial. A preferência de movimento reduzido inicia a simulação pausada.
+
+Para usar **TRAFFIC** com Supabase, aplique a migração `supabase/migrations/202611190001_traffic_category.sql` ao banco. Ela amplia as restrições e as duas funções transacionais, preservando autenticação, propriedade e histórico. No modo demonstrativo, a categoria funciona no armazenamento local.
 
 ## Limitações e próximos passos
 
-A versão atual usa uma visualização cartográfica inclinada e marcadores georreferenciados estilizados. Ela **não implementa modelos GLB/GLTF ou extrusões reais de edifícios**, pois a fonte raster OSM escolhida não fornece footprints/alturas e o projeto não inclui modelos 3D. A evolução recomendada é adotar uma fonte vetorial licenciada, criar a camada de extrusão e integrar Three.js com modelos otimizados. Busca por endereço também permanece explicitamente simulada. Fotos pequenas são guardadas como data URL no armazenamento local e não são enviadas a servidor.
+O mapa real precisa de conexão com OpenFreeMap. Os modelos são servidos pelo próprio aplicativo. A vista detalhada aparece a partir do zoom 15,5; ao afastar a câmera, permanece a visão cartográfica. A simulação de trânsito é visual e local, não uma previsão de mobilidade nem uma fonte de dados em tempo real. A busca por endereço consulta o Photon e move a câmera para o resultado escolhido. Fotos pequenas são guardadas como data URL no modo local e não são enviadas a servidor.
+
+
+### Navegação e atendimento público
+
+- Categorias na barra lateral filtram as ocorrências e os efeitos 3D. Clique novamente na categoria ou em **Todas as categorias** para limpar. O filtro de status permite consultar resolvidas e canceladas.
+- O HUD identifica a rua mais próxima do centro com os nomes dos dados vetoriais, sem chamadas de geocodificação a cada movimento. Onde não houver rua nomeada em até 180 metros, mostra coordenadas e uma mensagem de orientação.
+- Digite um endereço e pressione Enter ou a lupa. Escolha um resultado para mover a câmera; um resultado único é aberto automaticamente. Há cache de até 40 consultas, cancelamento de busca anterior, limite de 12 segundos e mensagens de indisponibilidade/nenhum resultado.
+- O provedor padrão é o [Photon](https://github.com/komoot/photon), com dados OpenStreetMap. O servidor público é destinado a uso moderado, sem garantia de disponibilidade. `VITE_GEOCODING_URL` permite configurar uma instância Photon própria, com CORS habilitado, para maior volume. A busca envia somente o texto consultado e a referência geográfica inicial do Rio.
+- Para contas públicas no Supabase, aplique `202611190002_public_service_accounts.sql` após as migrações anteriores. O cadastro grava órgão, esfera e cargo; `PUBLIC_AGENT` pode atualizar status de qualquer ocorrência pelo RPC autenticado. Não recebe acesso ao painel administrativo nem permissão para editar dados arbitrários ou promover perfis. O histórico grava o usuário autenticado em cada mudança.
+- Cadastro institucional autodeclarado não comprova vínculo com o governo. Nenhum domínio de e-mail é tratado como verificação automática.
+- Teste local: **Criar conta → Órgão público → preencher dados → clicar em ocorrência → Novo status → Atualizar status**. Para retornar com esse perfil, use o mesmo e-mail.

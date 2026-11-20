@@ -1,0 +1,30 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { expect, it } from 'vitest';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { RegisterPage } from '../src/pages/RegisterPage';
+import { LoginPage } from '../src/pages/LoginPage';
+function Profile() { const auth = useAuth(); return <><output data-testid="profile">{JSON.stringify({ ...auth.profile, canManage: auth.canManageIncidents, isAdmin: auth.isAdmin })}</output><button onClick={() => void auth.signOut()}>Sair</button>{!auth.user && <LoginPage/>}</>; }
+it('cadastra órgão com cargo, concede atendimento e preserva o perfil no próximo login', async () => {
+  const user = userEvent.setup();
+  render(<AuthProvider><MemoryRouter initialEntries={['/register']}><Routes><Route path="/register" element={<RegisterPage/>}/><Route path="/map" element={<Profile/>}/></Routes></MemoryRouter></AuthProvider>);
+  await user.click(screen.getByRole('radio', { name: /Órgão público/ }));
+  expect(screen.getByLabelText('Órgão público', { selector: 'input' })).toBeRequired();
+  expect(screen.getByLabelText('Cargo público')).toBeRequired();
+  await user.type(screen.getByLabelText('Órgão público', { selector: 'input' }), 'Prefeitura do Rio');
+  await user.type(screen.getByLabelText('Cargo público'), 'Fiscal');
+  await user.selectOptions(screen.getByLabelText('Esfera de atuação'), 'MUNICIPAL');
+  await user.type(screen.getByLabelText('Nome completo'), 'Ana Silva');
+  await user.type(screen.getByLabelText('E-mail'), 'ana-publica@example.com');
+  await user.type(screen.getByLabelText('Senha'), 'senha-teste');
+  await user.click(screen.getByRole('button', { name: /Criar conta/ }));
+  const profile = JSON.parse((await screen.findByTestId('profile')).textContent!);
+  expect(profile).toMatchObject({ role: 'PUBLIC_AGENT', organizationName: 'Prefeitura do Rio', publicPosition: 'Fiscal', canManage: true, isAdmin: false });
+  expect(localStorage.getItem('br-alerta-demo-profiles')).not.toContain('senha-teste');
+  await user.click(screen.getByRole('button', { name: 'Sair' }));
+  await user.type(screen.getByLabelText('E-mail'), 'ana-publica@example.com');
+  await user.type(screen.getByLabelText('Senha'), 'senha-teste');
+  await user.click(screen.getByRole('button', { name: /Entrar/ }));
+  expect(JSON.parse(screen.getByTestId('profile').textContent!)).toMatchObject(profile);
+});

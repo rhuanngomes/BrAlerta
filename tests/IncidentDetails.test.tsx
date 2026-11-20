@@ -37,7 +37,7 @@ describe('detalhes da ocorrência selecionada', () => {
     expect(screen.getByText(incident.title)).toBeInTheDocument();
     expect(screen.getByText(incident.address!)).toBeInTheDocument();
     expect(screen.getByText('Pendente')).toBeInTheDocument();
-    expect(screen.getByText('Em análise')).toBeInTheDocument();
+    expect(screen.getByText('Em andamento')).toBeInTheDocument();
     expect(screen.getByText('Resolvido')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Ver no mapa/ }));
@@ -54,4 +54,15 @@ describe('detalhes da ocorrência selecionada', () => {
 
     expect(screen.getByText('Foto não adicionada')).toBeInTheDocument();
   });
+});
+
+it('oferece atendimento somente quando autorizado e salva o status escolhido', async () => {
+  const update = vi.fn().mockResolvedValue({ ...incident, status: 'RESOLVED' });
+  const { rerender } = render(<IncidentDetails incident={incident} onClose={vi.fn()}/>);
+  expect(screen.queryByRole('button', { name: 'Atualizar status' })).not.toBeInTheDocument();
+  rerender(<IncidentDetails incident={incident} onClose={vi.fn()} onUpdateStatus={update} attendant="Prefeitura · Fiscal"/>);
+  fireEvent.change(screen.getByLabelText('Novo status'), { target: { value: 'RESOLVED' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Atualizar status' }));
+  expect(update).toHaveBeenCalledWith('RESOLVED');
+  expect(await screen.findByRole('status')).toHaveTextContent('Status atualizado');
 });

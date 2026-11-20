@@ -41,7 +41,7 @@ type Context = {
 const C = createContext<Context | null>(null);
 
 export function IncidentsProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, canManageIncidents, loading: authLoading } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -251,9 +251,9 @@ export function IncidentsProvider({ children }: { children: React.ReactNode }) {
 
   const updateStatus = useCallback(
     async (id: string, status: IncidentStatus) => {
-      if (!user || !isAdmin) {
+      if (!user || !canManageIncidents) {
         throw normalizeIntegrationError(
-          new Error('Somente administradores podem atualizar o status.'),
+          new Error('Somente agentes públicos e administradores podem atualizar o status.'),
         );
       }
       if (updating.current.has(id)) {
@@ -273,7 +273,7 @@ export function IncidentsProvider({ children }: { children: React.ReactNode }) {
         updating.current.delete(id);
       }
     },
-    [user, isAdmin],
+    [user, canManageIncidents],
   );
 
   const updateOwnPending = useCallback(

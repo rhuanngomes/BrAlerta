@@ -1,3 +1,4 @@
+import { nearestStreet } from './streetLocation';
 import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type {
@@ -7,7 +8,7 @@ import type {
   MapMouseEvent,
   Marker,
 } from 'maplibre-gl';
-import { Crosshair, Layers3, LocateFixed, Minus, Plus } from 'lucide-react';
+import { Crosshair, LocateFixed, Minus, Plus, Pause, Play, Navigation, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { visualDaCategoria } from '../../design/assets';
@@ -17,8 +18,9 @@ import type { ThreeSceneLayer as ThreeSceneLayerType } from './ThreeSceneLayer';
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
-const CENTER: [number, number] = [-43.465, -23.025];
-const INITIAL_PITCH = 60;
+const CENTER: [number, number] = [-43.4628, -23.0228];
+const INITIAL_PITCH = 55;
+const INITIAL_ZOOM = 18.7;
 const MODEL_ZOOM_THRESHOLD = 15.5;
 const buildingLayerId = '3d-buildings';
 const sceneLayerId = 'three-scene';
@@ -28,6 +30,7 @@ const categoryOptions: Array<{ value: IncidentCategory; icon: string }> = [
   { value: 'POTHOLE', icon: '⚠️' },
   { value: 'FLOOD', icon: '🌊' },
   { value: 'SAFETY', icon: '🛡️' },
+  { value: 'TRAFFIC', icon: '🚗' },
 ];
 
 type Coordinates = { lat: number; lng: number };
@@ -39,7 +42,8 @@ type CityMapProps = {
   onSelect: (incident: Incident) => void;
   onPlace: (coordinates: Coordinates) => void;
   onSetPlacing: (category: IncidentCategory | null) => void;
-  focus?: Coordinates | null;
+  focus?: (Coordinates & { zoom?: number; label?: string; locality?: string }) | null;
+  draftCoordinates?: Coordinates | null;
 };
 
 function createBuildingLayer(): FillExtrusionLayerSpecification {
@@ -49,9 +53,10 @@ function createBuildingLayer(): FillExtrusionLayerSpecification {
     source: 'openmaptiles',
     'source-layer': 'building',
     minzoom: 14,
+    maxzoom: MODEL_ZOOM_THRESHOLD,
     filter: ['!=', ['get', 'hide_3d'], true],
     paint: {
-      'fill-extrusion-color': '#aebfc6',
+      'fill-extrusion-color': '#d5cbb7',
       'fill-extrusion-height': [
         'coalesce',
         ['to-number', ['get', 'render_height']],
@@ -78,6 +83,7 @@ export function CityMap({
   onPlace,
   onSetPlacing,
   focus,
+  draftCoordinates = null,
 }: CityMapProps) {
   const element = useRef<HTMLDivElement>(null);
   const map = useRef<MapInstance | null>(null);
@@ -87,16 +93,27 @@ export function CityMap({
   const incidentsRef = useRef(incidents);
   const callbacks = useRef({ onSelect, onPlace, onSetPlacing });
   const placingRef = useRef(placing);
+  const draftRef = useRef(draftCoordinates);
+  const labelsHidden = useRef<boolean | null>(null);
   const paletteButtons = useRef<Array<HTMLButtonElement | null>>([]);
   const [is3d, setIs3d] = useState(true);
   const is3dRef = useRef(is3d);
+  const [paused, setPaused] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+  const pausedRef = useRef(paused);
+  const [mapError, setMapError] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [streetLocation, setStreetLocation] = useState('Localizando rua…');
+  const [centerCoordinates, setCenterCoordinates] = useState('');
+  const [zoomLevel, setZoomLevel] = useState(INITIAL_ZOOM);
+  useEffect(() => { pausedRef.current = paused; sceneLayer.current?.setPaused(paused); }, [paused]);
 
   useEffect(() => {
     incidentsRef.current = incidents;
     callbacks.current = { onSelect, onPlace, onSetPlacing };
     placingRef.current = placing;
+    draftRef.current = draftCoordinates;
     is3dRef.current = is3d;
-  }, [incidents, is3d, onPlace, onSelect, onSetPlacing, placing]);
+  }, [incidents, is3d, onPlace, onSelect, onSetPlacing, placing, draftCoordinates]);
 
   useEffect(() => {
     if (!element.current) return;
@@ -107,14 +124,28 @@ export function CityMap({
     const instance = new maplibregl.Map({
       container: element.current,
       center: CENTER,
-      zoom: 16,
+      zoom: INITIAL_ZOOM,
       pitch: INITIAL_PITCH,
-      bearing: -15,
+      bearing: -28,
       style: 'https://tiles.openfreemap.org/styles/liberty',
+      maxPitch: 65,
+      attributionControl: { compact: true },
+      canvasContextAttributes: { antialias: true },
     });
     map.current = instance;
+    const resizeObserver = new ResizeObserver(() => instance.resize());
+    resizeObserver.observe(element.current);
 
     const ensureLayers = () => {
+      setMapReady(true); setMapError(false);
+      labelsHidden.current = null;
+      for (const layer of instance.getStyle().layers ?? []) {
+        if (layer.type === 'fill-extrusion') instance.setLayoutProperty(layer.id, 'visibility', 'none');
+        if (layer.type === 'background') instance.setPaintProperty(layer.id, 'background-color', '#e4e4d7');
+        if (layer.type === 'fill' && /water/.test(layer.id)) instance.setPaintProperty(layer.id, 'fill-color', '#8ac8d1');
+        if (layer.type === 'fill' && /park|grass|wood/.test(layer.id)) instance.setPaintProperty(layer.id, 'fill-color', '#b6cf91');
+        if (layer.type === 'symbol' && /poi|housenumber/.test(layer.id)) instance.setLayoutProperty(layer.id, 'visibility', 'none');
+      }
       if (!instance.getLayer(buildingLayerId)) {
         const firstSymbol = instance.getStyle().layers?.find(
           (layer) => layer.type === 'symbol',
@@ -151,16 +182,35 @@ export function CityMap({
       instance.addLayer(layer, firstSymbol?.id);
       layer.setIncidents(incidentsRef.current);
       layer.setZoom(instance.getZoom());
+      layer.setEnabled(is3dRef.current);
+      for (const styleLayer of instance.getStyle().layers ?? []) {
+        if (styleLayer.type === 'symbol') instance.setLayoutProperty(styleLayer.id, 'visibility', is3dRef.current && instance.getZoom() >= MODEL_ZOOM_THRESHOLD ? 'none' : 'visible');
+      }
+      layer.setPaused(pausedRef.current);
     };
 
     const updateZoomState = () => {
       const zoom = instance.getZoom();
+      setZoomLevel(zoom);
       sceneLayer.current?.setZoom(zoom);
-      const offset: [number, number] = zoom >= MODEL_ZOOM_THRESHOLD ? [0, -36] : [0, 0];
+      const hidden = is3dRef.current && zoom >= MODEL_ZOOM_THRESHOLD;
+      if (labelsHidden.current !== hidden) {
+        for (const layer of instance.getStyle()?.layers ?? []) {
+          if (layer.type === 'symbol') instance.setLayoutProperty(layer.id, 'visibility', hidden ? 'none' : 'visible');
+        }
+        labelsHidden.current = hidden;
+      }
+      const offset: [number, number] = zoom >= MODEL_ZOOM_THRESHOLD ? [0, -12] : [0, 0];
       for (const marker of mapMarkers.values()) marker.setOffset(offset);
     };
 
     const handleClick = (event: MapMouseEvent) => {
+      if (placingRef.current) {
+        const position = sceneLayer.current?.snapCoordinates(event.lngLat.lng, event.lngLat.lat) ?? event.lngLat;
+        callbacks.current.onPlace({ lat: position.lat, lng: position.lng });
+        sceneLayer.current?.setPreview(placingRef.current, [position.lng, position.lat]);
+        return;
+      }
       const canvas = instance.getCanvas();
       const hitId = sceneLayer.current?.hitTest(
         event.point,
@@ -175,32 +225,47 @@ export function CityMap({
         }
       }
 
-      const category = placingRef.current;
-      if (category) {
-        callbacks.current.onPlace({
-          lat: event.lngLat.lat,
-          lng: event.lngLat.lng,
-        });
-      }
     };
 
     const handleMove = (event: MapMouseEvent) => {
+      if (draftRef.current) return;
       const category = placingRef.current;
+      const position = sceneLayer.current?.snapCoordinates(event.lngLat.lng, event.lngLat.lat) ?? event.lngLat;
       sceneLayer.current?.setPreview(
         category,
         category && is3dRef.current && instance.getZoom() >= MODEL_ZOOM_THRESHOLD
-          ? [event.lngLat.lng, event.lngLat.lat]
+          ? [position.lng, position.lat]
           : null,
       );
     };
 
+    let streetTimer: number | undefined;
+    const updateStreet = () => {
+      const center = instance.getCenter();
+      setCenterCoordinates(`${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`);
+      if (!instance.getSource('openmaptiles')) return;
+      const features = instance.querySourceFeatures('openmaptiles', { sourceLayer: 'transportation_name' });
+      const street = nearestStreet(features, center.lng, center.lat);
+      setStreetLocation(street ? `Próximo a ${street}` : 'Explore o mapa para localizar uma rua');
+    };
+    const scheduleStreet = () => {
+      if (streetTimer !== undefined) return;
+      streetTimer = window.setTimeout(() => { streetTimer = undefined; if (!disposed) updateStreet(); }, 350);
+    };
+    instance.on('moveend', scheduleStreet);
+    instance.on('sourcedata', scheduleStreet);
     instance.on('style.load', ensureLayers);
+    instance.on('error', () => { if (!instance.isStyleLoaded()) setMapError(true); });
     instance.on('zoom', updateZoomState);
     instance.on('click', handleClick);
     instance.on('mousemove', handleMove);
 
     return () => {
       disposed = true;
+      window.clearTimeout(streetTimer);
+      instance.off('moveend', scheduleStreet);
+      instance.off('sourcedata', scheduleStreet);
+      resizeObserver.disconnect();
       instance.off('style.load', ensureLayers);
       instance.off('zoom', updateZoomState);
       instance.off('click', handleClick);
@@ -281,7 +346,7 @@ export function CityMap({
         marker.setLngLat([incident.longitude, incident.latitude]);
       }
       marker.setOffset(
-        currentMap.getZoom() >= MODEL_ZOOM_THRESHOLD ? [0, -36] : [0, 0],
+        currentMap.getZoom() >= MODEL_ZOOM_THRESHOLD ? [0, -12] : [0, 0],
       );
 
       const element = marker.getElement();
@@ -310,30 +375,38 @@ export function CityMap({
   useEffect(() => {
     sceneLayer.current?.setPreview(
       placing,
-      null,
+      draftCoordinates ? [draftCoordinates.lng, draftCoordinates.lat] : null,
     );
     if (map.current) {
       map.current.getCanvas().style.cursor = placing ? 'crosshair' : '';
     }
-  }, [placing]);
+  }, [placing, draftCoordinates]);
 
   useEffect(() => {
-    if (focus) {
-      map.current?.flyTo({
+    if (focus && map.current) {
+      // The details panel changes the container width in the same React commit.
+      // Resize before flyTo calculates its target screen position.
+      map.current.resize();
+      map.current.flyTo({
         center: [focus.lng, focus.lat],
-        zoom: 17,
-        pitch: is3d ? INITIAL_PITCH : 0,
+        zoom: focus.zoom ?? 19.8,
+        offset: [0, window.innerWidth <= 620 ? -map.current.getCanvas().clientHeight * .12 : 0],
+        pitch: is3dRef.current ? INITIAL_PITCH : 0,
         duration: 1200,
       });
     }
-  }, [focus, is3d]);
+  }, [focus, mapReady]);
 
   function setView3d(enabled: boolean) {
     setIs3d(enabled);
+    sceneLayer.current?.setEnabled(enabled);
+    for (const layer of map.current?.getStyle().layers ?? []) {
+      if (layer.type === 'symbol') map.current?.setLayoutProperty(layer.id, 'visibility', enabled && (map.current?.getZoom() ?? 0) >= MODEL_ZOOM_THRESHOLD ? 'none' : 'visible');
+    }
     if (!enabled) sceneLayer.current?.setPreview(null, null);
     map.current?.easeTo({
       pitch: enabled ? INITIAL_PITCH : 0,
-      bearing: enabled ? -15 : 0,
+      bearing: enabled ? -28 : 0,
     });
     if (map.current?.getLayer(buildingLayerId)) {
       map.current.setLayoutProperty(
@@ -365,14 +438,22 @@ export function CityMap({
   const goHome = () => {
     map.current?.flyTo({
       center: CENTER,
-      zoom: 16,
+      zoom: INITIAL_ZOOM,
       pitch: is3d ? INITIAL_PITCH : 0,
-      bearing: is3d ? -15 : 0,
+      bearing: is3d ? -28 : 0,
     });
   };
 
   return (
-    <div className="map-wrap">
+    <div className={`map-wrap ${placing ? 'is-placing' : ''}`}>
+      <div className="city-heading">
+        <span className="city-kicker"><i /> CIDADE VIVA <span>MAPA REAL</span></span>
+        <h1>Seu bairro em movimento.</h1>
+        <p className="street-location" title={centerCoordinates}><LocateFixed size={13}/><span>{streetLocation}</span></p><small className="map-coordinate-label">Centro do mapa · {centerCoordinates || 'carregando'}</small>
+        <div className="city-indicators"><span><i /> {incidents.length} ocorrências visíveis</span><span>{paused ? 'Simulação pausada' : 'A cidade reage a você'}</span></div>
+      </div>
+      {!mapReady && !mapError && <div className="city-map-message" role="status">Construindo sua cidade…</div>}
+      {mapError && !mapReady && <div className="city-map-message" role="alert">Não foi possível carregar o mapa. Verifique sua conexão.<button onClick={() => { setMapError(false); map.current?.setStyle('https://tiles.openfreemap.org/styles/liberty'); }}>Tentar novamente</button></div>}
       <div
         ref={element}
         className="map-canvas"
@@ -386,7 +467,7 @@ export function CityMap({
           aria-pressed={is3d}
           onClick={() => setView3d(true)}
         >
-          Mapa 3D
+          Cidade 3D
         </button>
         <button
           type="button"
@@ -397,7 +478,10 @@ export function CityMap({
           Mapa 2D
         </button>
       </div>
-      <div className="layers" aria-hidden="true"><Layers3 /></div>
+      <div className="city-playback">
+        <button type="button" aria-label={paused ? 'Retomar simulação' : 'Pausar simulação'} aria-pressed={paused} onClick={() => setPaused(!paused)}>{paused ? <Play size={16} /> : <Pause size={16} />}</button>
+        <button type="button" aria-label="Girar cidade" onClick={() => { const current = map.current; if (current) current.easeTo({ bearing: current.getBearing() + 45 }); }}><RotateCcw size={16} /></button>
+      </div>
       <div
         className="map-insert-palette"
         role="group"
@@ -410,7 +494,7 @@ export function CityMap({
           onClick={() => onSetPlacing(null)}
           onKeyDown={(event) => movePaletteFocus(0, event)}
         >
-          Navegar
+          <Navigation size={16} /> Explorar
         </button>
         {categoryOptions.map(({ value, icon }, index) => (
           <button
@@ -423,7 +507,7 @@ export function CityMap({
             onKeyDown={(event) => movePaletteFocus(index + 1, event)}
           >
             <span aria-hidden="true">{icon}</span>
-            {incidentCategoryLabels[value]}
+            {{ STREETLIGHT: 'Iluminação', POTHOLE: 'Buraco', FLOOD: 'Alagamento', SAFETY: 'Segurança', TRAFFIC: 'Trânsito' }[value]}
           </button>
         ))}
       </div>
@@ -435,7 +519,10 @@ export function CityMap({
               <button
                 type="button"
                 aria-current={selectedId === incident.id ? 'true' : undefined}
-                onClick={() => onSelect(incident)}
+                onClick={(event) => {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                  onSelect(incident);
+                }}
               >
                 <span>{incident.title}</span>
                 <small>{incidentCategoryLabels[incident.category]}</small>
@@ -457,11 +544,12 @@ export function CityMap({
           <Crosshair />
           <div>
             <b>Posicione: {incidentCategoryLabels[placing]}</b>
-            <span>Passe o cursor para pré-visualizar e clique no local</span>
+            <span>Clique na rua para posicionar. Depois, publique seu relato.</span>
           </div>
         </div>
       )}
-      <span className="demo-label">Dados de ocorrências demonstrativos</span>
+      {is3d && zoomLevel < MODEL_ZOOM_THRESHOLD && <div className="city-zoom-hint">Aproxime o mapa para explorar a cidade viva.</div>}
+      <span className="demo-label">Ocorrências demonstrativas · Modelos KayKit / CC0</span>
     </div>
   );
 }

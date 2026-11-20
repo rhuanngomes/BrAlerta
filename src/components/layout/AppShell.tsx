@@ -1,4 +1,5 @@
 import {
+  Car,
   Bell,
   Building2,
   Check,
@@ -9,7 +10,6 @@ import {
   LogIn,
   ListChecks,
   Map,
-  MapPin,
   Menu,
   ShieldCheck,
   ShieldAlert,
@@ -18,9 +18,10 @@ import {
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useIncidents } from '../../context/IncidentsContext';
+import { AddressSearch } from './AddressSearch';
 import { statusLabel } from '../incidents/StatusBadge';
 import { incidentCategoryLabels } from '../../types';
 import type { Incident, IncidentCategory } from '../../types';
@@ -98,6 +99,9 @@ const nav = [
 ] as const;
 
 export function AppShell() {
+  const location = useLocation();
+  const categoryFilter = new URLSearchParams(location.search).get('category');
+  const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [open, setOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -209,17 +213,23 @@ export function AppShell() {
         </nav>
 
         <div className="category-nav">
-          <div className="category-heading">
-            <Building2 size={16} />
-            <span>Categorias</span>
-            <ChevronDown size={15} />
-          </div>
-          <div className="category-items">
-            <div><Lightbulb size={17} /><span>Poste apagado</span></div>
-            <div><TriangleAlert size={17} /><span>Buraco na rua</span></div>
-            <div><Waves size={17} /><span>Rua alagada</span></div>
-            <div><ShieldAlert size={17} /><span>Ocorrência de segurança</span></div>
-          </div>
+          <button type="button" className="category-heading" aria-expanded={categoriesOpen} aria-controls="category-filters" onClick={() => setCategoriesOpen(!categoriesOpen)}>
+            <Building2 size={16}/><span>Categorias</span><ChevronDown size={15}/>
+          </button>
+          {categoriesOpen && <div className="category-items" id="category-filters" aria-label="Filtrar ocorrências por categoria">
+            {([
+              ['', 'Todas as categorias', Map],
+              ['STREETLIGHT', 'Poste apagado', Lightbulb],
+              ['POTHOLE', 'Buraco na rua', TriangleAlert],
+              ['FLOOD', 'Rua alagada', Waves],
+              ['SAFETY', 'Ocorrência de segurança', ShieldAlert],
+              ['TRAFFIC', 'Trânsito intenso', Car],
+            ] as const).map(([category, label, Icon]) => <button type="button" key={category}
+              aria-pressed={location.pathname === '/map' && (categoryFilter || '') === category}
+              onClick={() => { navigate(category && categoryFilter !== category ? `/map?category=${category}` : '/map'); setOpen(false); }}>
+              <Icon size={17}/><span>{label}</span>
+            </button>)}
+          </div>}
         </div>
 
         <div className="city">
@@ -241,18 +251,7 @@ export function AppShell() {
           <button className="mobile-brand" onClick={() => navigate('/map')} aria-label="BR ALERTA, ir para o mapa">
             <img src={MARCA.logo} alt="" />
           </button>
-          <div className="search">
-            <MapPin size={17} />
-            <input
-              aria-label="Buscar local"
-              placeholder="Buscar endereço ou ponto de interesse..."
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  alert('A busca por endereço ainda não está conectada.');
-                }
-              }}
-            />
-          </div>
+          <AddressSearch/>
           <div className="notification-area">
             <button
               className="icon notification-button"
@@ -406,7 +405,7 @@ export function AppShell() {
               <span className="avatar">{initials}</span>
               <span className="profile-copy">
                 <b>{fullName}</b>
-                <small>{isAdmin ? 'Administrador' : 'Cidadão'}</small>
+                <small>{isAdmin ? 'Administrador' : profile?.role === 'PUBLIC_AGENT' ? 'Órgão público' : 'Cidadão'}</small>
               </span>
               <ChevronDown size={15} aria-hidden="true" />
             </button>

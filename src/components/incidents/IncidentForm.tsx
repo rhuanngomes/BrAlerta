@@ -156,6 +156,11 @@ export function IncidentForm({
               <b>Segurança</b>
               {category === 'SAFETY' && <Check aria-hidden="true" />}
             </button>
+            <button type="button" className={category === 'TRAFFIC' ? 'selected' : ''}
+              aria-pressed={category === 'TRAFFIC'} onClick={() => setCategory('TRAFFIC')}>
+              <span aria-hidden="true">🚗</span><b>Trânsito intenso</b>
+              {category === 'TRAFFIC' && <Check aria-hidden="true" />}
+            </button>
           </div>
         </fieldset>
 

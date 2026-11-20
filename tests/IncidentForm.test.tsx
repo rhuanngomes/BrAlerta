@@ -76,6 +76,17 @@ describe('fluxo do formulário de ocorrência', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ category: 'SAFETY' }));
   });
 
+  it('publica trânsito com a categoria e as coordenadas escolhidas', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<IncidentForm coords={{ lat: -23.023, lng: -43.463 }} onCancel={vi.fn()} onSubmit={onSubmit} />);
+    await user.click(screen.getByRole('button', { name: /Trânsito intenso/ }));
+    await user.type(screen.getByPlaceholderText(/Poste apagado/), 'Fila no cruzamento');
+    await user.type(screen.getByPlaceholderText(/Descreva o problema/), 'Veículos parados nas duas pistas.');
+    await user.click(screen.getByRole('button', { name: /Publicar ocorrência/ }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ category: 'TRAFFIC', latitude: -23.023, longitude: -43.463 }));
+  });
+
   it('exige marcar um ponto no mapa antes de publicar', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();

@@ -10,7 +10,6 @@ import {
   LogIn,
   ListChecks,
   Map,
-  MapPin,
   Menu,
   ShieldCheck,
   ShieldAlert,

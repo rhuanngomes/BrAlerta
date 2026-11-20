@@ -101,6 +101,12 @@ npm test           # roda os testes automatizados
 npm run test:db    # roda os testes de banco e RLS (requer Supabase local)
 ```
 
+Para validar o banco, inicie o Docker e execute `npx supabase start` antes de
+`npm run test:db`. A configuração versionada em `supabase/config.toml` aplica as
+migrações em um banco novo. O `supabase/seed.sql` é uma carga demonstrativa manual
+que exige uma conta existente; por isso não é executado automaticamente no CI.
+Os testes de banco criam seus próprios usuários e desfazem os dados ao terminar.
+
 ## Estrutura do frontend
 
 - Vite com React e TypeScript; a configuração de compilação também verifica os tipos.

@@ -1,0 +1,63 @@
+# Shared local/CI configuration. Remote credentials stay in .env.local.
+project_id = "br-alerta"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+health_timeout = "2m"
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+# seed.sql is an opt-in demo fixture: it requires an existing Auth account.
+# Database tests create their own users and roll back all fixtures.
+enabled = false
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_signup = true
+minimum_password_length = 8
+
+[auth.email]
+enabled = true
+enable_confirmations = false
+
+# Not used by this application; keep local and CI startup lightweight.
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
+
+[storage.vector]
+enabled = false

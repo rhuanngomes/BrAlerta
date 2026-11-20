@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="64" height="80" role="img" aria-label="BR ALERTA">
+<g transform="scale(.5)" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M50.39 14.57 A24 24 0 0 0 11.53 42.52 L32 76 L52.47 42.52 A24 24 0 0 0 55.64 25.83"/>
+  <path d="M41 23 A12.7 12.7 0 0 1 41 41" transform="rotate(-40 32 32)"/>
+  <circle cx="32" cy="32" r="5.6" fill="#FFFFFF" stroke="none"/>
+</g>
+</svg>

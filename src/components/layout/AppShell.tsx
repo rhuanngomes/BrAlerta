@@ -27,6 +27,7 @@ import { statusLabel } from '../incidents/StatusBadge';
 import { incidentCategoryLabels } from '../../types';
 import type { Incident, IncidentCategory } from '../../types';
 
+import { MARCA } from '../../design/assets';
 type SystemNotification = {
   id: string;
   incidentId: string;
@@ -192,10 +193,7 @@ export function AppShell() {
     <div className="app-shell">
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
-          <MapPin className="brand-mark" aria-hidden="true" />
-          <span>
-            BR <b>ALERTA</b>
-          </span>
+          <img className="brand-logo" src={MARCA.logoBranco} alt="BR ALERTA" />
           <button
             className="icon mobile-only"
             onClick={() => setOpen(false)}
@@ -251,8 +249,8 @@ export function AppShell() {
           >
             <Menu />
           </button>
-          <button className="mobile-brand" onClick={() => navigate('/map')}>
-            BR <b>ALERTA</b>
+          <button className="mobile-brand" onClick={() => navigate('/map')} aria-label="BR ALERTA, ir para o mapa">
+            <img src={MARCA.logo} alt="" />
           </button>
           <AddressSearch/>
           <div className="notification-area">

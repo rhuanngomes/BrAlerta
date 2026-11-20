@@ -31,7 +31,7 @@ describe('acesso demonstrativo local', () => {
       </AuthProvider>,
     );
 
-    expect(screen.getByText(/Acesso demonstrativo local/)).toBeInTheDocument();
+    expect(screen.getByText(/Ambiente demonstrativo/)).toBeInTheDocument();
     await user.type(screen.getByPlaceholderText('voce@email.com'), 'demo@example.com');
     await user.type(screen.getByPlaceholderText('Sua senha'), 'senha-local');
     await user.click(screen.getByRole('button', { name: /Entrar/ }));

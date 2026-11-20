@@ -4,6 +4,7 @@ import { Link, Navigate } from 'react-router-dom';
 import type { GovernmentLevel } from '../context/AuthContext';
 import { useAuth } from '../context/AuthContext';
 
+import { MARCA } from '../design/assets';
 export function RegisterPage() {
   const { user, signUp, loading, error, clearError } = useAuth();
   const [fullName, setFullName] = useState('');
@@ -23,7 +24,7 @@ export function RegisterPage() {
     try { const result = await signUp(fullName.trim(), email.trim(), password, { role: accountType, organizationName, governmentLevel, publicPosition }); setConfirmation(result.needsEmailConfirmation); } catch { /* exibido pelo contexto */ }
   }
 
-  return <div className="auth-page"><section className="auth-visual register-visual"><div className="auth-brand"><span className="brand-pin">●</span><span>BR <b>ALERTA</b></span></div><div><span className="auth-kicker"><MapPin/> PARTICIPE DA SUA CIDADE</span><h1>Seu olhar pode ajudar a transformar o <em>território.</em></h1><p>Crie sua conta para registrar e acompanhar ocorrências urbanas.</p></div><small>Seus dados são protegidos pelas políticas de acesso do Supabase.</small></section><section className="auth-form-wrap">{confirmation?<div className="auth-form auth-success"><span>✓</span><h2>Verifique seu e-mail</h2><p>Enviamos uma confirmação para <b>{email}</b>. Confirme o endereço e depois entre na plataforma.</p><Link className="primary" to="/login">Ir para o login</Link></div>:<form className="auth-form" onSubmit={submit}><span className="eyebrow">NOVA CONTA</span><h2>Faça parte do BR Alerta</h2><p>Participe como cidadão ou atenda a população pelo seu órgão público.</p><fieldset className="account-type"><legend>Tipo de conta</legend>
+  return <div className="auth-page"><section className="auth-visual register"><div className="auth-brand"><img className="auth-logo" src={MARCA.logoBranco} alt="BR ALERTA" /></div><div><span className="auth-kicker"><MapPin/> PARTICIPE DA SUA CIDADE</span><h1>Seu olhar pode ajudar a transformar o <em>território.</em></h1><p>Crie sua conta para registrar e acompanhar ocorrências urbanas.</p></div><small>Seus dados são protegidos pelas políticas de acesso do Supabase.</small></section><section className="auth-form-wrap">{confirmation?<div className="auth-form auth-success"><span>✓</span><h2>Verifique seu e-mail</h2><p>Enviamos uma confirmação para <b>{email}</b>. Confirme o endereço e depois entre na plataforma.</p><Link className="primary" to="/login">Ir para o login</Link></div>:<form className="auth-form" onSubmit={submit}><span className="eyebrow">NOVA CONTA</span><h2>Faça parte do BR Alerta</h2><p>Participe como cidadão ou atenda a população pelo seu órgão público.</p><fieldset className="account-type"><legend>Tipo de conta</legend>
   <label><input type="radio" name="accountType" value="CITIZEN" checked={accountType === 'CITIZEN'} onChange={() => setAccountType('CITIZEN')}/><span>Cidadão<small>Registrar e acompanhar</small></span></label>
   <label><input type="radio" name="accountType" value="PUBLIC_AGENT" checked={accountType === 'PUBLIC_AGENT'} onChange={() => setAccountType('PUBLIC_AGENT')}/><span>Órgão público<small>Atender ocorrências</small></span></label>
 </fieldset>

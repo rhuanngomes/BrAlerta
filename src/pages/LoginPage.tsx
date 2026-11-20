@@ -5,6 +5,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseEnabled } from '../lib/runtime';
 
+import { MARCA } from '../design/assets';
 export function LoginPage() {
   const { user, signIn, loading, error, clearError } = useAuth();
   const [email, setEmail] = useState('');
@@ -31,8 +32,7 @@ export function LoginPage() {
     <div className="auth-page">
       <section className="auth-visual">
         <div className="auth-brand">
-          <span className="brand-pin">●</span>
-          <span>BR <b>ALERTA</b></span>
+          <img className="auth-logo" src={MARCA.logoBranco} alt="BR ALERTA" />
         </div>
         <div>
           <span className="auth-kicker"><MapPin /> INTELIGÊNCIA URBANA COLABORATIVA</span>
